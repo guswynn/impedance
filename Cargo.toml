@@ -3,6 +3,7 @@ name = "impedance"
 version = "0.1.0"
 authors = ["Gus Wynn <guswynn@gmail.com>"]
 edition = "2018"
+description = "Tools to mix blocking and async code"
 
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/guswynn/impedance"
