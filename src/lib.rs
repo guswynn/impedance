@@ -1,7 +1,14 @@
+pub mod adaptive;
+
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    use super::*;
+    use adaptive::AdaptiveFuture;
+
+    #[tokio::test]
+    async fn it_works() {
+        let thing = AdaptiveFuture::new(|| {
+            1});
+        assert_eq!(1, thing.await);
     }
 }
