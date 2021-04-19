@@ -1,0 +1,4 @@
+# Example (nightly) features that you may want on
+unstable_features = true
+merge_imports = true
+edition = "2018"
