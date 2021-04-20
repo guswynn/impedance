@@ -15,7 +15,7 @@ use tokio::{
     task::{spawn_blocking, JoinHandle},
 };
 
-use crate::token::Token;
+use super::token::{Token, TokenType};
 
 static TIMINGS: Lazy<Mutex<HashMap<Token, AdaptiveState>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -73,10 +73,16 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
 
         match this.fut.take() {
             Some(f) => {
-                // Need to drop the lock before entering the run_and_bench section
-                let state = { *(*TIMINGS.lock()).entry(*this.token).or_default() };
+                let state = match this.token.0 {
+                    TokenType::AlwaysInline => AdaptiveState::Inline,
+                    TokenType::AlwaysSpawn => AdaptiveState::Spawn,
+                    // Need to drop the lock before entering the `track_and_run` section
+                    _ => *(*TIMINGS.lock()).entry(*this.token).or_default(),
+                };
+
                 match state {
                     AdaptiveState::Inline => {
+                        println!("inline chosen");
                         // Just run it inline
                         Poll::Ready(track_and_run(*this.token, *this.cutoff, f))
                     }
@@ -105,6 +111,7 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                 }
             }
             None => {
+                println!("gus");
                 let jh = this.inner.as_mut().expect("re-polled a Ready Future");
 
                 // Re-register the waker if its still possible

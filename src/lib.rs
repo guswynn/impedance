@@ -1,12 +1,10 @@
 pub mod adaptive;
-mod core;
-pub mod token;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use adaptive::AdaptiveFuture;
-    use token::Token;
+    use adaptive::Token;
     use tokio::runtime::Handle;
 
     #[tokio::test]

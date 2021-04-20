@@ -3,7 +3,7 @@
 extern crate test;
 
 use futures::stream::{iter, StreamExt};
-use impedance::{adaptive::AdaptiveFuture, token::Token};
+use impedance::adaptive::{AdaptiveFuture, Token};
 use once_cell::sync::Lazy;
 use std::future::Future;
 use test::{black_box, Bencher};
@@ -28,7 +28,8 @@ fn benchmark<B: Fn(usize) -> usize + Copy, W: Fn(usize, B) -> F + Copy, F: Futur
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
     b.iter(|| {
         runtime.block_on(async {
-            let mut stream = iter(vec![0; 10])
+            let v: Vec<usize> = (0..10).collect();
+            let mut stream = iter(v)
                 .map(|i| async move { black_box(wrapper(i, bench).await) })
                 .buffer_unordered(10);
 
@@ -73,4 +74,18 @@ fn fast_with_spawn_blocking(b: &mut Bencher) {
 #[bench]
 fn fast_with_nothing(b: &mut Bencher) {
     benchmark(b, fast, |i, f| async move { f(i) });
+}
+
+#[bench]
+fn fast_with_adaptive_always_inline(b: &mut Bencher) {
+    benchmark(b, fast, |i, f| {
+        AdaptiveFuture::new(Token::always_inline(), move || f(i))
+    });
+}
+
+#[bench]
+fn fast_adaptive_always_spawn(b: &mut Bencher) {
+    benchmark(b, fast, |i, f| {
+        AdaptiveFuture::new(Token::always_spawn(), move || f(i))
+    });
 }
