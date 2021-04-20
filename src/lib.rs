@@ -1,4 +1,5 @@
 pub mod adaptive;
+mod core;
 pub mod token;
 
 #[cfg(test)]

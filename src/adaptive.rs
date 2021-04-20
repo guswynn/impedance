@@ -15,53 +15,27 @@ use tokio::{
     task::{spawn_blocking, JoinHandle},
 };
 
-use crate::token::Token;
+use crate::{core::TimedBlockingFuture, token::Token};
 
-/// see `benches/
-pub const BLOCKING_DURATION: Duration = Duration::from_nanos(100000);
-static DATA: Lazy<Mutex<HashMap<Token, AdaptiveState>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-
-#[derive(Clone, Copy)]
-enum AdaptiveState {
-    Inline,
-    Spawn,
-}
-
-impl Default for AdaptiveState {
-    fn default() -> Self {
-        AdaptiveState::Inline
-    }
-}
+/// see [here](https://github.com/guswynn/impedance/blob/main/benches/comparisons.rs#L66-L71`)
+/// to get a baseline cost of [spawn_blocking](tokio::task::spawn_blocking) (on your machine)
+///
+/// Currently this is set to `100_000` nanoseconds. This may change, or need to be made
+/// configurable for your usecase.
+pub const BLOCKING_CUTOFF_DURATION: Duration = Duration::from_nanos(100000);
 
 #[pin_project]
 pub struct AdaptiveFuture<O, F> {
-    fut: Option<F>,
-    token: Token,
-    inner: Option<JoinHandle<O>>,
-    wakeup: Option<Receiver<()>>,
+    #[pin]
+    inner: TimedBlockingFuture<O, F>,
 }
 
 impl<O, F: FnOnce() -> O> AdaptiveFuture<O, F> {
     pub fn new(token: Token, future: F) -> Self {
         AdaptiveFuture {
-            fut: Some(future),
-            token,
-            inner: None,
-            wakeup: None,
+            inner: TimedBlockingFuture::new(token, BLOCKING_CUTOFF_DURATION, future),
         }
     }
-}
-
-fn run_and_bench<O, F: FnOnce() -> O>(token: Token, f: F) -> O {
-    let now = Instant::now();
-    let ret = f();
-
-    if now.elapsed() > BLOCKING_DURATION {
-        DATA.lock().insert(token, AdaptiveState::Spawn);
-    } else {
-        DATA.lock().insert(token, AdaptiveState::Inline);
-    }
-    ret
 }
 
 impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for AdaptiveFuture<O, F> {
@@ -69,62 +43,6 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for AdaptiveFu
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        println!("GUS");
-
-        match this.fut.take() {
-            Some(f) => {
-                // Need to drop the lock before entering the run_and_bench section
-
-                let state = { *(*DATA.lock()).entry(*this.token).or_default() };
-                match state {
-                    AdaptiveState::Inline => Poll::Ready(run_and_bench(*this.token, f)),
-                    AdaptiveState::Spawn => {
-                        let (tx, mut rx) = channel();
-
-                        let token = *this.token;
-                        let jh = spawn_blocking(move || {
-                            let ret = run_and_bench(token, f);
-                            let _ = tx.send(());
-                            ret
-                        });
-                        // Register the waker
-                        // This is a new Receiver, so we can drop the result
-                        // after the first poll
-                        let _ = Pin::new(&mut rx).poll(cx);
-                        *this.wakeup = Some(rx);
-                        *this.inner = Some(jh);
-                        Poll::Pending
-                    }
-                }
-            }
-            None => {
-                let jh = this.inner.as_mut().expect("re-polled a Ready Future");
-
-                // Re-register the waker if its still possible
-                match this.wakeup.as_mut() {
-                    Some(rx) => match Pin::new(rx).poll(cx) {
-                        Poll::Ready(_) => {
-                            *this.wakeup = None;
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                }
-
-                match Pin::new(jh).poll(cx) {
-                    Poll::Ready(Ok(val)) => Poll::Ready(val),
-                    Poll::Ready(Err(e)) => match e.try_into_panic() {
-                        Ok(panic) => {
-                            std::panic::resume_unwind(panic);
-                        }
-                        Err(_) => {
-                            // Task is shutting down so lets just pend
-                            Poll::Pending
-                        }
-                    },
-                    _ => Poll::Pending,
-                }
-            }
-        }
+        this.inner.poll(cx)
     }
 }
