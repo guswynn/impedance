@@ -4,10 +4,19 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 static CURRENT: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
-pub struct Token(usize);
+enum TokenType {
+    AdhocAdaptive(usize),
+    AlwaysInline,
+    AlwaysSpawn,
+}
+
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+pub struct Token(TokenType);
 
 impl Token {
     pub fn new() -> Self {
-        Token(CURRENT.fetch_add(1, Ordering::SeqCst))
+        Token(TokenType::AdhocAdaptive(
+            CURRENT.fetch_add(1, Ordering::SeqCst),
+        ))
     }
 }

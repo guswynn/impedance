@@ -33,7 +33,7 @@ impl Default for AdaptiveState {
 }
 
 #[pin_project]
-pub struct AdaptiveFuture<O, F: FnOnce() -> O> {
+pub struct AdaptiveFuture<O, F> {
     fut: Option<F>,
     token: Token,
     inner: Option<JoinHandle<O>>,

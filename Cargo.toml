@@ -4,9 +4,10 @@ version = "0.1.2"
 authors = ["Gus Wynn <guswynn@gmail.com>"]
 edition = "2018"
 description = "Tools to mix blocking and async code"
+documentation = "https://docs.rs/impedance"
+repository = "https://github.com/guswynn/impedance"
 
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/guswynn/impedance"
 
 [features]
 default = ["tokio"]

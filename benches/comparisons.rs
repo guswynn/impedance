@@ -42,21 +42,35 @@ fn benchmark<B: Fn(usize) -> usize + Copy, W: Fn(usize, B) -> F + Copy, F: Futur
 static TOKEN: Lazy<Token> = Lazy::new(|| Token::new());
 
 #[bench]
-fn with_adaptive_slow(b: &mut Bencher) {
+fn slow_with_adaptive(b: &mut Bencher) {
     benchmark(b, slow, |i, f| AdaptiveFuture::new(*TOKEN, move || f(i)));
 }
 
 #[bench]
-fn no_adaptive_slow(b: &mut Bencher) {
+fn slow_with_spawn_blocking(b: &mut Bencher) {
+    benchmark(b, slow, |i, f| async move {
+        tokio::task::spawn_blocking(move || f(i)).await.unwrap()
+    });
+}
+
+#[bench]
+fn slow_with_nothing(b: &mut Bencher) {
     benchmark(b, slow, |i, f| async move { f(i) });
 }
 
 #[bench]
-fn with_adaptive_fast(b: &mut Bencher) {
+fn fast_with_adaptive(b: &mut Bencher) {
     benchmark(b, fast, |i, f| AdaptiveFuture::new(*TOKEN, move || f(i)));
 }
 
 #[bench]
-fn no_adaptive_fast(b: &mut Bencher) {
+fn fast_with_spawn_blocking(b: &mut Bencher) {
+    benchmark(b, fast, |i, f| async move {
+        tokio::task::spawn_blocking(move || f(i)).await.unwrap()
+    });
+}
+
+#[bench]
+fn fast_with_nothing(b: &mut Bencher) {
     benchmark(b, fast, |i, f| async move { f(i) });
 }
