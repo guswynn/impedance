@@ -8,7 +8,25 @@
 //!
 //! A wrapper around blocking work that can adaptively move that work to another thread when it is
 //! expensive (where expensive == long *wall-time*). It works in tandem with its configuration
-//! mechanism [`Token`](adaptive::Token).
+//! mechanism [`Token`](adaptive::Token). This can sometimes give us the best of both worlds:
+//!
+//! ```
+//! $ cargo +nightly bench
+//! ...
+//! test fast_with_adaptive               ... bench:       4,782 ns/iter (+/- 627)
+//! test fast_with_adaptive_always_inline ... bench:       4,412 ns/iter (+/- 699)
+//! test fast_with_adaptive_always_spawn  ... bench:      55,455 ns/iter (+/- 22,798)
+//! test fast_with_nothing                ... bench:       3,391 ns/iter (+/- 227)
+//! test fast_with_spawn_blocking         ... bench:      51,054 ns/iter (+/- 10,620)
+//! test slow_with_adaptive               ... bench:  12,092,260 ns/iter (+/- 1,572,018)
+//! test slow_with_nothing                ... bench: 122,687,873 ns/iter (+/- 16,353,904)
+//! test slow_with_spawn                  ... bench:  24,730,260 ns/iter (+/- 3,003,759)
+//! test slow_with_spawn_blocking         ... bench:  12,543,033 ns/iter (+/- 2,753,322)
+//! ...
+//! ```
+//! (See [the benchmarks
+//! themselves](https://github.com/guswynn/impedance/blob/main/benches/comparisons.rs) for more
+//! info)
 //!
 //! - `buffer_unordered/buffered` helpers (coming hopefully soon)
 //! Helpers that avoid pitfalls when using `buffer_unordered`.
