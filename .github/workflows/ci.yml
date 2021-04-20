@@ -17,4 +17,4 @@ jobs:
       - name: Install Nightly
         run: rustup update nightly
       - name: cargo +nightly bench
-        run: cargo bench
+        run: cargo +nightly bench
