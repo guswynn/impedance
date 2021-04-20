@@ -94,6 +94,8 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                                 let cutoff = *this.cutoff;
                                 spawn_blocking(move || {
                                     let ret = track_and_run(token, cutoff, f);
+                                    // Panic's cause tx to be dropped which will wake the
+                                    // Reciever
                                     let _ = tx.send(());
                                     ret
                                 })
@@ -102,8 +104,13 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                             *this.wakeup = Some(rx);
                             *this.inner = Some(jh);
 
-                            // TODO(guswynn): This is hacky, I should just make a waker myself...
+                            // TODO(guswynn): This is hacky, I should just make a waker myself,
+                            // but making sure I wake when tx is dropped is non-trivial
+                            // maybe I should just clean up the code
+                            //
                             // Register the waker
+                            // figure out how to control this in cfg(test)
+                            // std::thread::sleep(Duration::from_secs(1));
                             match Pin::new(this.wakeup.as_mut().unwrap()).poll(cx) {
                                 Poll::Ready(_) => {
                                     // We are ready so we need to immediately wraparound
