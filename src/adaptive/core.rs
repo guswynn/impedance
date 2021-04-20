@@ -71,73 +71,81 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
 
-        match this.fut.take() {
-            Some(f) => {
-                let state = match this.token.0 {
-                    TokenType::AlwaysInline => AdaptiveState::Inline,
-                    TokenType::AlwaysSpawn => AdaptiveState::Spawn,
-                    // Need to drop the lock before entering the `track_and_run` section
-                    _ => *(*TIMINGS.lock()).entry(*this.token).or_default(),
-                };
+        loop {
+            match this.fut.take() {
+                Some(f) => {
+                    let state = match this.token.0 {
+                        TokenType::AlwaysInline => AdaptiveState::Inline,
+                        TokenType::AlwaysSpawn => AdaptiveState::Spawn,
+                        // Need to drop the lock before entering the `track_and_run` section
+                        _ => *(*TIMINGS.lock()).entry(*this.token).or_default(),
+                    };
 
-                match state {
-                    AdaptiveState::Inline => {
-                        println!("inline chosen");
-                        // Just run it inline
-                        Poll::Ready(track_and_run(*this.token, *this.cutoff, f))
-                    }
-                    AdaptiveState::Spawn => {
-                        // Spawn the blocking task
-                        let (tx, mut rx) = channel();
-                        let jh = {
-                            let token = *this.token;
-                            let cutoff = *this.cutoff;
-                            spawn_blocking(move || {
-                                let ret = track_and_run(token, cutoff, f);
-                                let _ = tx.send(());
-                                ret
-                            })
-                        };
+                    match state {
+                        AdaptiveState::Inline => {
+                            // Just run it inline
+                            return Poll::Ready(track_and_run(*this.token, *this.cutoff, f));
+                        }
+                        AdaptiveState::Spawn => {
+                            // Spawn the blocking task
+                            let (tx, rx) = channel();
+                            let jh = {
+                                let token = *this.token;
+                                let cutoff = *this.cutoff;
+                                spawn_blocking(move || {
+                                    let ret = track_and_run(token, cutoff, f);
+                                    let _ = tx.send(());
+                                    ret
+                                })
+                            };
 
-                        // Register the waker
-                        // This is a new Receiver, so we can drop the result
-                        // after the first poll
-                        let _ = Pin::new(&mut rx).poll(cx);
-                        *this.wakeup = Some(rx);
-                        *this.inner = Some(jh);
+                            *this.wakeup = Some(rx);
+                            *this.inner = Some(jh);
 
-                        Poll::Pending
+                            // TODO(guswynn): This is hacky, I should just make a waker myself...
+                            // Register the waker
+                            match Pin::new(this.wakeup.as_mut().unwrap()).poll(cx) {
+                                Poll::Ready(_) => {
+                                    // We are ready so we need to immediately wraparound
+                                    // otherwise we will not be woken up
+                                    *this.wakeup = None;
+                                    continue;
+                                }
+                                Poll::Pending => {}
+                            }
+
+                            return Poll::Pending;
+                        }
                     }
                 }
-            }
-            None => {
-                println!("gus");
-                let jh = this.inner.as_mut().expect("re-polled a Ready Future");
+                None => {
+                    let jh = this.inner.as_mut().expect("re-polled a Ready Future");
 
-                // Re-register the waker if its still possible
-                // TODO(guswynn): is this needed?
-                match this.wakeup.as_mut() {
-                    Some(rx) => match Pin::new(rx).poll(cx) {
-                        Poll::Ready(_) => {
-                            *this.wakeup = None;
-                        }
+                    // Re-register the waker if its still possible
+                    // TODO(guswynn): is this needed?
+                    match this.wakeup.as_mut() {
+                        Some(rx) => match Pin::new(rx).poll(cx) {
+                            Poll::Ready(_) => {
+                                *this.wakeup = None;
+                            }
+                            _ => {}
+                        },
                         _ => {}
-                    },
-                    _ => {}
-                }
+                    }
 
-                match Pin::new(jh).poll(cx) {
-                    Poll::Ready(Ok(val)) => Poll::Ready(val),
-                    Poll::Ready(Err(e)) => match e.try_into_panic() {
-                        Ok(panic) => {
-                            std::panic::resume_unwind(panic);
-                        }
-                        Err(_) => {
-                            // Task is shutdown so lets just pend
-                            Poll::Pending
-                        }
-                    },
-                    _ => Poll::Pending,
+                    match Pin::new(jh).poll(cx) {
+                        Poll::Ready(Ok(val)) => return Poll::Ready(val),
+                        Poll::Ready(Err(e)) => match e.try_into_panic() {
+                            Ok(panic) => {
+                                std::panic::resume_unwind(panic);
+                            }
+                            Err(_) => {
+                                // Task is shutdown so lets just pend
+                                return Poll::Pending;
+                            }
+                        },
+                        _ => return Poll::Pending,
+                    }
                 }
             }
         }

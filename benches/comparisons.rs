@@ -24,18 +24,23 @@ fn benchmark<B: Fn(usize) -> usize + Copy, W: Fn(usize, B) -> F + Copy, F: Futur
     b: &mut Bencher,
     bench: B,
     wrapper: W,
-) {
+) where
+    F::Output: std::fmt::Display,
+{
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
     b.iter(|| {
         runtime.block_on(async {
             let v: Vec<usize> = (0..10).collect();
+            println!("new one");
             let mut stream = iter(v)
                 .map(|i| async move { black_box(wrapper(i, bench).await) })
                 .buffer_unordered(10);
 
             while let Some(i) = stream.next().await {
+                println!("got: {}", i);
                 black_box(i);
             }
+            println!("HUH");
         });
     });
 }
