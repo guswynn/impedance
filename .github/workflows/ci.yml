@@ -9,3 +9,12 @@ jobs:
         run: rustup update stable
       - name: cargo test
         run: cargo test
+  bench:
+    name: Bench on nightly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Nightly
+        run: rustup update nightly
+      - name: cargo +nightly bench
+        run: cargo bench
