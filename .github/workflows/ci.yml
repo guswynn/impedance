@@ -1,4 +1,10 @@
-on: [push, pull_request]
+name: Actions
+
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
 jobs:
   test:
     name: Test on stable
