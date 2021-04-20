@@ -65,6 +65,13 @@ fn slow_with_nothing(b: &mut Bencher) {
 }
 
 #[bench]
+fn slow_with_spawn(b: &mut Bencher) {
+    benchmark(b, slow, |i, f| async move {
+        tokio::task::spawn(async move { f(i) }).await.unwrap()
+    });
+}
+
+#[bench]
 fn fast_with_adaptive(b: &mut Bencher) {
     benchmark(b, fast, |i, f| AdaptiveFuture::new(*TOKEN, move || f(i)));
 }
@@ -89,7 +96,7 @@ fn fast_with_adaptive_always_inline(b: &mut Bencher) {
 }
 
 #[bench]
-fn fast_adaptive_always_spawn(b: &mut Bencher) {
+fn fast_with_adaptive_always_spawn(b: &mut Bencher) {
     benchmark(b, fast, |i, f| {
         AdaptiveFuture::new(Token::always_spawn(), move || f(i))
     });

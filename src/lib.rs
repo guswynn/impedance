@@ -1,3 +1,23 @@
+//! `impedance` is a library that provides utilities to make working with blocking code while in
+//! the context of asynchronous code easier. It is named after [this
+//! phenomenom](https://en.wikipedia.org/wiki/Impedance_matching).
+//!
+//! ## Utilities
+//!
+//! - [`adaptive::AdaptiveFuture`](adaptive::AdaptiveFuture)
+//!
+//! A wrapper around blocking work that can adaptively move that work to another thread when it is
+//! expensive (where expensive == long *wall-time*). It works in tandem with its configuration
+//! mechanism [`Token`](adaptive::Token).
+//!
+//! - `buffer_unordered/buffered` helpers (coming hopefully soon)
+//! Helpers that avoid pitfalls when using `buffer_unordered`.
+//!
+//! ## Features
+//! This library should be design in a way such that any executor that has a
+//! `spawn_blocking` method can be used. However, currently it only implements it for
+//! [`tokio`](tokio) which is in its `default_features`.
+//!
 pub mod adaptive;
 
 #[cfg(test)]

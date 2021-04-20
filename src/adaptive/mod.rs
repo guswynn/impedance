@@ -2,10 +2,10 @@
 //!
 //! The `adaptive` module defines types that help you schedule *blocking work* (namely, not
 //! `async`) adaptively. If the work is cheap, we save on the overhead of things like
-//! [spawn_blocking](tokio::task::spawn_blocking) by skipping moving work to a thread
-//! and instead running it inline in the [poll](std::future::Future::poll) implementation.
+//! [`spawn_blocking`](tokio::task::spawn_blocking) by skipping moving work to a thread
+//! and instead running it inline in the [`poll`](std::future::Future::poll) implementation.
 //!
-//! The most important type in this module is [AdaptiveFuture], which wraps an [FnOnce]
+//! The most important type in this module is [`AdaptiveFuture`][AdaptiveFuture], which wraps an [`FnOnce`](FnOnce)
 //! representing the blocking work you want to perform.
 //!
 //! ## Usage
@@ -35,15 +35,16 @@
 //!
 //! ## Scheduling Scheme
 //! `AdaptiveFuture` decides when to inline work based on the last *wall-time* of the work
-//! it has performed. The granularity of this *wall-time* is based on the *[Token]* passed
+//! it has performed. The granularity of this *wall-time* is based on the [`Token`](Token) passed
 //! into the constructor. This allows to user to have fine-grained control based on their
 //! knowledge of how the *possibly-expensvie* cpu work they are guarding with an `AdaptiveFuture`
 //! will perform, in different parts of their program.
 //!
 //!
-//! To see more information about how to construct `Token`'s and various options, see [Token].
+//! To see more information about how to construct `Token`'s and various options, see
+//! [`Token`](Token).
 //! The above example shows the common-case default of using a
-//! `static` *unique* `Token` configured to use the default cutoff time ([BLOCKING_CUTOFF_DURATION])
+//! `static` *unique* `Token` configured to use the default cutoff time ([`BLOCKING_CUTOFF_DURATION`][BLOCKING_CUTOFF_DURATION])
 //!
 //! More complex scheduling schemes may be available in the future.
 use pin_project::pin_project;
@@ -66,11 +67,11 @@ use self::core::TimedBlockingFuture;
 /// configurable for your usecase.
 pub const BLOCKING_CUTOFF_DURATION: Duration = Duration::from_nanos(100000);
 
-/// A [Future] representing *blocking work*
+/// A [`Future`][Future] representing *blocking work*
 ///
 /// It either
-/// 1. Runs work inline in its [poll](std::future::Future::poll) implementation
-/// 2. Schedules the work on another thread using [spawn_blocking](tokio::task::spawn_blocking)
+/// 1. Runs work inline in its [`poll`](std::future::Future::poll) implementation
+/// 2. Schedules the work on another thread using [`spawn_blocking`](tokio::task::spawn_blocking)
 ///
 /// see *[the module documentation](self)* for usage examples.
 #[pin_project]
@@ -81,8 +82,8 @@ pub struct AdaptiveFuture<O, F> {
 
 impl<O, F: FnOnce() -> O> AdaptiveFuture<O, F> {
     /// Create a new `AdaptiveFuture` that will adaptively schedule blocking work
-    /// inline or in thread ([spawn_blocking](tokio::task::spawn_blocking)) associated
-    /// the [Token](token::Token)
+    /// inline or in thread ([`spawn_blocking`](tokio::task::spawn_blocking)) associated
+    /// the [`Token`](Token)
     pub fn new(token: Token, future: F) -> Self {
         AdaptiveFuture {
             inner: TimedBlockingFuture::new(token, BLOCKING_CUTOFF_DURATION, future),

@@ -129,16 +129,18 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                     let jh = this.inner.as_mut().expect("re-polled a Ready Future");
 
                     // Re-register the waker if its still possible
-                    // TODO(guswynn): is this needed?
-                    match this.wakeup.as_mut() {
+                    // If we got a ready, we need to busy poll so we can the returned
+                    // value signalled by the channe;
+                    let busy_poll = match this.wakeup.as_mut() {
                         Some(rx) => match Pin::new(rx).poll(cx) {
                             Poll::Ready(_) => {
                                 *this.wakeup = None;
+                                true
                             }
-                            _ => {}
+                            _ => false,
                         },
-                        _ => {}
-                    }
+                        _ => false,
+                    };
 
                     match Pin::new(jh).poll(cx) {
                         Poll::Ready(Ok(val)) => return Poll::Ready(val),
@@ -151,6 +153,7 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                                 return Poll::Pending;
                             }
                         },
+                        Poll::Pending if busy_poll => continue,
                         _ => return Poll::Pending,
                     }
                 }
