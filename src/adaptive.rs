@@ -17,7 +17,8 @@ use tokio::{
 
 use crate::token::Token;
 
-const BLOCKING_DURATION: Duration = Duration::from_millis(5);
+/// see `benches/
+pub const BLOCKING_DURATION: Duration = Duration::from_nanos(100000);
 static DATA: Lazy<Mutex<HashMap<Token, AdaptiveState>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Copy)]
