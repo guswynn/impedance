@@ -8,9 +8,11 @@ use std::{
     task::{Context, Poll},
     time::{Duration, Instant},
 };
+// TODO(azw): support more executors
+#[cfg(feature = "tokio")]
 use tokio::{
     sync::oneshot::{channel, Receiver},
-    task::JoinHandle,
+    task::{spawn_blocking, JoinHandle},
 };
 
 use crate::token::Token;
@@ -79,7 +81,7 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for AdaptiveFu
                         let (tx, mut rx) = channel();
 
                         let token = *this.token;
-                        let jh = tokio::task::spawn_blocking(move || {
+                        let jh = spawn_blocking(move || {
                             let ret = run_and_bench(token, f);
                             let _ = tx.send(());
                             ret
