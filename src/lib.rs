@@ -10,7 +10,7 @@
 //! expensive (where expensive == long *wall-time*). It works in tandem with its configuration
 //! mechanism [`Token`](adaptive::Token). This can sometimes give us the best of both worlds:
 //!
-//! ```
+//! ```ignore
 //! $ cargo +nightly bench
 //! ...
 //! test fast_with_adaptive               ... bench:       4,782 ns/iter (+/- 627)
