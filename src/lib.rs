@@ -33,12 +33,20 @@
 //!
 //! ## Features
 //! This library should be design in a way such that any executor that has a
-//! `spawn_blocking` method can be used. However, currently it only implements it for
-//! [`tokio`](tokio) which is in its `default_features`.
+//! `spawn_blocking` method can be used:
 //!
+// TODO(guswynn): can rustdoc auto make these links for me?
+//! - `tokio`: Currently this library tries to provide good support
+//! for [`tokio`](tokio) which is in its `default_features`.
+//! - `async-std-futures`: This library has experimental support for using [`async-std`](https://docs.rs/async-std) (as well as
+//! [`futures`](https://docs.rs/futures) internally for a oneshot channel). You will need to use `default-features
+//! = false`
+//! and there are caveats: First and foremost, panic payloads's are NOT ALWAYS propagated
+//! correctly, they have a default failed task message when the work was moved to a thread.
+//!   - TODO: consider [`async_executors`](https://docs.rs/async_executors) for this abstraction
 pub mod adaptive;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tokio"))]
 mod tests {
     use super::*;
     use adaptive::{AdaptiveFuture, Token};
@@ -69,7 +77,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "gus")]
     async fn test_panic_adaptive() {
         let thing = AdaptiveFuture::new(Token::new(), || {
             if false {
@@ -82,7 +90,45 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic]
+    #[should_panic(expected = "gus")]
+    async fn test_panic_spawning() {
+        let thing = AdaptiveFuture::new(Token::always_spawn(), || {
+            if false {
+                1_isize
+            } else {
+                panic!("gus");
+            }
+        });
+        assert_eq!(1, thing.await);
+    }
+}
+
+#[cfg(all(test, feature = "async-std-futures"))]
+mod async_std_tests {
+    use super::*;
+    use adaptive::{AdaptiveFuture, Token};
+
+    #[async_std::test]
+    async fn test_basic() {
+        let thing = AdaptiveFuture::new(Token::new(), || 1);
+        assert_eq!(1, thing.await);
+    }
+
+    #[async_std::test]
+    #[should_panic(expected = "gus")]
+    async fn test_panic_adaptive() {
+        let thing = AdaptiveFuture::new(Token::new(), || {
+            if false {
+                1_isize
+            } else {
+                panic!("gus");
+            }
+        });
+        assert_eq!(1, thing.await);
+    }
+
+    #[async_std::test]
+    #[should_panic(expected = "task has failed")]
     async fn test_panic_spawning() {
         let thing = AdaptiveFuture::new(Token::always_spawn(), || {
             if false {

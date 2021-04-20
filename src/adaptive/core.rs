@@ -9,6 +9,10 @@ use std::{
     time::{Duration, Instant},
 };
 // TODO(azw): support more executors
+#[cfg(feature = "async-std-futures")]
+use async_std::task::{spawn_blocking, JoinHandle};
+#[cfg(feature = "async-std-futures")]
+use futures::channel::oneshot::{channel, Receiver};
 #[cfg(feature = "tokio")]
 use tokio::{
     sync::oneshot::{channel, Receiver},
@@ -142,8 +146,13 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                         _ => false,
                     };
 
+                    println!("GUS");
                     match Pin::new(jh).poll(cx) {
+                        #[cfg(feature = "async-std-futures")]
+                        Poll::Ready(val) => return Poll::Ready(val),
+                        #[cfg(feature = "tokio")]
                         Poll::Ready(Ok(val)) => return Poll::Ready(val),
+                        #[cfg(feature = "tokio")]
                         Poll::Ready(Err(e)) => match e.try_into_panic() {
                             Ok(panic) => {
                                 std::panic::resume_unwind(panic);

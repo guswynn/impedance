@@ -9,6 +9,8 @@ jobs:
         run: rustup update stable
       - name: cargo test
         run: cargo test
+      - name: cargo test async_std
+        run: cargo test --no-default-features --features async-std-futures
   bench:
     name: Bench on nightly
     runs-on: ubuntu-latest
