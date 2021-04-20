@@ -1,6 +1,6 @@
 # Impedance: Tools to mix blocking and async code
 
-See [https://docs.rs/impedance] for more info.
+See [the docs](https://docs.rs/impedance) for more info.
 
 ## `cargo +nightly bench`:
 
