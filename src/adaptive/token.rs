@@ -39,3 +39,8 @@ impl Token {
         Token(TokenType::AlwaysSpawn)
     }
 }
+impl Default for Token {
+    fn default() -> Self {
+        Self::new()
+    }
+}

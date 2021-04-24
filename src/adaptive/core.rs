@@ -105,20 +105,24 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                                 })
                             };
 
+                            // Store the reciever to poll later
                             *this.wakeup = Some(rx);
+                            // Store the handle to the spawned blocking task, to join later
                             *this.inner = Some(jh);
 
                             // TODO(guswynn): This is hacky, I should just make a waker myself,
                             // but making sure I wake when tx is dropped is non-trivial
-                            // maybe I should just clean up the code
                             //
-                            // Register the waker
-                            // figure out how to control this in cfg(test)
+                            // TODO(guswynn): figure out how to control this in cfg(test):
                             // std::thread::sleep(Duration::from_secs(1));
+                            //
+                            // Polling the Reciever registers the task's waker
+                            // If the blocking thread is working fast, we may immediately
+                            // see that we are ready. We aren't just wrapping around as an
+                            // optimization: We must read the value off the JoinHandle
+                            // as we no longer have any way to recieve wakeups.
                             match Pin::new(this.wakeup.as_mut().unwrap()).poll(cx) {
                                 Poll::Ready(_) => {
-                                    // We are ready so we need to immediately wraparound
-                                    // otherwise we will not be woken up
                                     *this.wakeup = None;
                                     continue;
                                 }
@@ -133,20 +137,34 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                     let jh = this.inner.as_mut().expect("re-polled a Ready Future");
 
                     // Re-register the waker if its still possible
-                    // If we got a ready, we need to busy poll so we can the returned
-                    // value signalled by the channe;
+                    // If we got a ready, we need to busy poll so we can get join handle
+                    // value signalled by this channel being ready. We MUST busy poll;
+                    // its not an optimization: once we consume our last possible wakeup,
+                    // we need to get the value out of the join handle
+                    //
+                    // TODO(guswynn): catch_unwind in the closure yourself and send the value
+                    // from the JoinHandle?
                     let busy_poll = match this.wakeup.as_mut() {
                         Some(rx) => match Pin::new(rx).poll(cx) {
                             Poll::Ready(_) => {
+                                // Like above, we don't care about the value,
+                                // as joining the handle below is what we want.
                                 *this.wakeup = None;
                                 true
                             }
-                            _ => false,
+                            Poll::Pending => {
+                                // Explicit false, as our waker it correctly registered in the
+                                // Reciever
+                                false
+                            }
                         },
-                        _ => false,
+                        None => {
+                            // an unset reciever means we need to continue to loop
+                            // until the join handle gives us the value
+                            true
+                        }
                     };
 
-                    println!("GUS");
                     match Pin::new(jh).poll(cx) {
                         #[cfg(feature = "async-std-futures")]
                         Poll::Ready(val) => return Poll::Ready(val),
@@ -158,12 +176,16 @@ impl<O: Send + 'static, F: FnOnce() -> O + Send + 'static> Future for TimedBlock
                                 std::panic::resume_unwind(panic);
                             }
                             Err(_) => {
-                                // Task is shutdown so lets just pend
+                                // Task is shutdown so we just pend:
+                                // We never abort the sub-task ourselves, so something
+                                // else is shutting everything else down, and the task
+                                // polling us will likely be shutting down as well
+                                // TODO(guswynn): figure out a way to test this
                                 return Poll::Pending;
                             }
                         },
                         Poll::Pending if busy_poll => continue,
-                        _ => return Poll::Pending,
+                        Poll::Pending => return Poll::Pending,
                     }
                 }
             }
