@@ -60,7 +60,8 @@ mod tests {
     // based
     #[tokio::test]
     async fn test_actually_async() {
-        let v = vec![1usize, 2, 3];
+        // github actions only have 2 cores
+        let v = vec![1usize, 2];
 
         use rayon::iter::ParallelIterator;
         // This is a rayon iter that takes at least 1 second to complete
@@ -89,7 +90,7 @@ mod tests {
         };
 
         // Then check that we can await the rest of par_iter, in less than 2 seconds
-        // (because we are parallizing the many 1 second durations
+        // (because we are parallizing the many 1 second durations)
         let count = par_iter.await;
         assert_eq!(count.unwrap(), 3);
         assert!(now.elapsed().as_secs() >= 1);
