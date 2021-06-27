@@ -38,7 +38,7 @@
 // TODO(guswynn): can rustdoc auto make these links for me?
 //! - `tokio`: Currently this library tries to provide good support
 //! for [`tokio`](tokio) which is in its `default_features`.
-//! - `async-std-futures`: This library has experimental support for using [`async-std`](https://docs.rs/async-std) (as well as
+//! - `async-std-experimental`: This library has experimental support for using [`async-std`](https://docs.rs/async-std) (as well as
 //! [`futures`](https://docs.rs/futures) internally for a oneshot channel). You will need to use `default-features
 //! = false`
 //! and there are caveats: First and foremost, panic payloads's are NOT ALWAYS propagated
@@ -47,6 +47,8 @@
 pub mod adaptive;
 
 #[cfg(all(feature = "rayon", feature = "tokio"))]
+// TODO(guswynn): use doc_cfg when its stable
+// #[doc(cfg(feature = "signal"))]
 pub mod rayon;
 
 #[cfg(all(test, feature = "tokio"))]
@@ -106,7 +108,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "async-std-futures"))]
+#[cfg(all(test, feature = "async-std-experimental"))]
 mod async_std_tests {
     use super::*;
     use adaptive::{AdaptiveFuture, Token};
