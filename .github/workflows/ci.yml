@@ -16,7 +16,7 @@ jobs:
       - name: cargo test
         run: cargo test
       - name: test rayon module
-        run: cargo test -features rayon
+        run: cargo test --features rayon
       - name: cargo test async_std
         run: cargo test --no-default-features --features async-std-experimental
   bench:
