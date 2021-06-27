@@ -46,6 +46,9 @@
 //!   - TODO: consider [`async_executors`](https://docs.rs/async_executors) for this abstraction
 pub mod adaptive;
 
+#[cfg(all(feature = "rayon", feature = "tokio"))]
+pub mod rayon;
+
 #[cfg(all(test, feature = "tokio"))]
 mod tests {
     use super::*;
