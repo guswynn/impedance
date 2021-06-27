@@ -92,7 +92,7 @@ mod tests {
         // Then check that we can await the rest of par_iter, in less than 2 seconds
         // (because we are parallizing the many 1 second durations)
         let count = par_iter.await;
-        assert_eq!(count.unwrap(), 3);
+        assert_eq!(count.unwrap(), 2);
         assert!(now.elapsed().as_secs() >= 1);
         assert!(now.elapsed().as_secs() < 2);
     }
