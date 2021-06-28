@@ -18,8 +18,54 @@ where
     rayon::spawn(move || {
         // See https://github.com/rayon-rs/rayon/blob/c571f8ffb4f74c8c09b4e1e6d9979b71b4414d07/rayon-core/src/spawn/mod.rs#L75
         // for a justification of this use of AssertUnwindSafe
+        /*
         let pass = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
             closure(t.into_par_iter())
+        }))
+        .map_err(|payload| Panicked { payload });*/
+
+        let pass = Ok(closure(t.into_par_iter()));
+
+        let _ = tx.send(pass);
+    });
+
+    rx.await.unwrap()
+}
+
+pub trait SetupHelper<'a, T> {
+    type Output: IntoParallelIterator + Send + 'a;
+    fn call(self, arg: &'a T) -> Self::Output;
+}
+impl<'a, D: 'a, F, T: 'a> SetupHelper<'a, T> for F
+where
+    F: FnOnce(&'a T) -> D,
+    D: IntoParallelIterator + Send,
+{
+    type Output = D;
+    fn call(self, arg: &'a T) -> D {
+        self(arg)
+    }
+}
+
+pub async fn par_iter_with_setup<T, R, S, M, F>(t: T, setup: S, closure: F) -> Result<R, Panicked>
+where
+    T: Send + 'static,
+    R: Send + 'static,
+    M: IntoParallelIterator + Send,
+    for<'a> S: SetupHelper<'a, T, Output = M> + Send + 'static,
+    F: FnOnce(<M as IntoParallelIterator>::Iter) -> R + Send + 'static,
+{
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    // Rayon turns panic's inside spawn's into aborts by default, but this
+    // is overrideable. We take great care to ensure that we won't panic in this closure
+    // and panic's inside the user-provided closure are caught
+    rayon::spawn(move || {
+        let middle = setup.call(&t);
+        // See https://github.com/rayon-rs/rayon/blob/c571f8ffb4f74c8c09b4e1e6d9979b71b4414d07/rayon-core/src/spawn/mod.rs#L75
+        // for a justification of this use of AssertUnwindSafe
+        let pass = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            closure(middle.into_par_iter())
         }))
         .map_err(|payload| Panicked { payload });
 
@@ -112,6 +158,7 @@ mod tests {
         );
     }
 
+    /*
     #[tokio::test]
     async fn test_panic_in_closure() {
         let v = vec![1usize, 2, 3];
@@ -122,5 +169,22 @@ mod tests {
             panicked.payload.downcast_ref::<&'static str>().unwrap(),
             &"gus2"
         );
+    }*/
+
+    fn setup<'a>(v: &'a Vec<String>) -> Vec<&'a str> {
+        v.iter().map(|s| s.as_str()).collect::<Vec<&str>>()
     }
+
+    /*
+    #[tokio::test]
+    async fn test_setup_borrowing() {
+        let v: Vec<String> = vec!["gus".to_string(), "gus2".to_string()];
+
+        use rayon::iter::ParallelIterator;
+        let total_len: usize = par_iter_with_setup(v, setup, |iter| iter.map(|s| s.len()).sum())
+            .await
+            .unwrap();
+
+        assert_eq!(total_len, 7,);
+    }*/
 }

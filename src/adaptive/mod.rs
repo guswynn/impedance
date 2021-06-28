@@ -65,7 +65,7 @@ use self::core::TimedBlockingFuture;
 ///
 /// Currently this is set to `100_000` nanoseconds. This may change, or need to be made
 /// configurable for your usecase.
-pub const BLOCKING_CUTOFF_DURATION: Duration = Duration::from_nanos(100000);
+// pub const BLOCKING_CUTOFF_DURATION: Duration = Duration::from_nanos(100000);
 
 /// A [`Future`][Future] representing *blocking work*
 ///
@@ -86,7 +86,11 @@ impl<O, F: FnOnce() -> O> AdaptiveFuture<O, F> {
     /// the [`Token`](Token)
     pub fn new(token: Token, future: F) -> Self {
         AdaptiveFuture {
-            inner: TimedBlockingFuture::new(token, BLOCKING_CUTOFF_DURATION, future),
+            inner: TimedBlockingFuture::new(
+                token,
+                Duration::from_nanos(100000), /*BLOCKING_CUTOFF_DURATION*/
+                future,
+            ),
         }
     }
 }
